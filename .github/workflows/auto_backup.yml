@@ -1,0 +1,35 @@
+name: MongoDB Data Backup
+
+on:
+  push:
+    branches:
+      - main
+  schedule:
+    - cron: "0 */12 * * *" # Runs every 12 hours
+
+jobs:
+  backup:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up AWS CLI
+        run: |
+          sudo apt update -y && sudo apt install -y awscli
+          aws configure set aws_access_key_id ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws configure set aws_secret_access_key ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws configure set region us-east-1
+
+      - name: Install MongoDB Client
+        run: |
+          sudo apt update -y
+          sudo apt install -y mongodb-clients
+
+      - name: Dump MongoDB and Upload to S3
+        run: |
+          TIMESTAMP=$(date +%Y%m%d%H%M%S)
+          BACKUP_FILE="mongo_backup_$TIMESTAMP.tar.gz"
+          mongodump --uri="${{ secrets.MONGO_URI }}" --out dump
+          tar -czf $BACKUP_FILE dump
+          aws s3 cp $BACKUP_FILE s3://your-bucket-name/mongo-backups/
